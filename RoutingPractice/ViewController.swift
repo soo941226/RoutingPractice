@@ -13,6 +13,7 @@ final class ViewController: UIViewController {
     private var distance: Double = 2000
     
     private let router = MapRouter()
+    private let polyLineRenderer = MapPolylineRenderer(lineWidth: 1.0, color: .red)
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -20,7 +21,7 @@ final class ViewController: UIViewController {
             self?.mapView.setCenter(point, animated: false)
         } 
         mapView.setCameraZoomRange(.init(maxCenterCoordinateDistance: distance), animated: false)
-        mapView.delegate = self
+        mapView.delegate = polyLineRenderer
 
         let tapGesture = UITapGestureRecognizer(target: self, action: #selector(onClick(_:)))
         mapView.addGestureRecognizer(tapGesture)
@@ -38,27 +39,10 @@ final class ViewController: UIViewController {
             switch result {
             case .success(let response):
                 guard let route = response.routes.first else { return }
-                print(mapPoint)
-                print(route.polyline)
                 self.mapView.addOverlay(route.polyline)
-
             case .failure(let error):
                 print(error)
             }
         }
-    }
-}
-
-extension ViewController: MKMapViewDelegate {
-    func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
-
-        if let polyline = overlay as? MKPolyline {
-            let renderer = MKPolylineRenderer(polyline: polyline)
-            renderer.lineWidth = 2
-            renderer.strokeColor = .red
-            return renderer
-        }
-
-        return MKOverlayRenderer()
     }
 }
