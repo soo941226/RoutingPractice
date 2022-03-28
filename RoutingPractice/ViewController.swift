@@ -7,68 +7,58 @@
 
 import UIKit
 import MapKit
-import CoreLocation
-
-final class AnnotaionView: NSObject, MKAnnotation {
-    private(set) var coordinate: CLLocationCoordinate2D
-    private(set) var title: String?
-    private(set) var subtitle: String?
-
-    init(
-        y: Double, x: Double,
-        title: String? = nil, subtitle: String? = nil
-    ) {
-        self.coordinate = .init(latitude: y, longitude: x)
-        self.title = title
-        self.subtitle = subtitle
-    }
-}
 
 final class ViewController: UIViewController {
-    @IBOutlet weak var mapView: MKMapView!
-
-    let locationManager = CLLocationManager()
+    @IBOutlet private weak var mapView: MKMapView!
+    private var distance: Double = 2000
+    
+    private let router = MapRouter()
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        router.configure { [weak self] point in
+            self?.mapView.setCenter(point, animated: false)
+        } 
+        mapView.setCameraZoomRange(.init(maxCenterCoordinateDistance: distance), animated: false)
+        mapView.delegate = self
 
-        locationManager.delegate = self
-        locationManager.desiredAccuracy = kCLLocationAccuracyHundredMeters
+        let tapGesture = UITapGestureRecognizer(target: self, action: #selector(onClick(_:)))
+        mapView.addGestureRecognizer(tapGesture)
+    }
 
-        if locationManager.authorizationStatus == .notDetermined {
-            locationManager.requestWhenInUseAuthorization()
+    @objc func onClick(_ sender: UIGestureRecognizer) {
+        guard let mapView = sender.view as? MKMapView else {
+            return
+        }
+        mapView.removeOverlays(mapView.overlays)
+        let touchPoint = sender.location(in: mapView)
+        let mapPoint = mapView.convert(touchPoint, toCoordinateFrom: mapView)
+
+        router.route(to: mapPoint) { result in
+            switch result {
+            case .success(let response):
+                guard let route = response.routes.first else { return }
+                print(mapPoint)
+                print(route.polyline)
+                self.mapView.addOverlay(route.polyline)
+
+            case .failure(let error):
+                print(error)
+            }
         }
     }
 }
 
-extension ViewController: CLLocationManagerDelegate {
-    func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
-        print(#function)
-        guard manager.authorizationStatus == .authorizedWhenInUse ||
-                manager.authorizationStatus == .authorizedAlways else {
-            return
+extension ViewController: MKMapViewDelegate {
+    func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
+
+        if let polyline = overlay as? MKPolyline {
+            let renderer = MKPolylineRenderer(polyline: polyline)
+            renderer.lineWidth = 2
+            renderer.strokeColor = .red
+            return renderer
         }
 
-        manager.requestLocation()
-    }
-
-    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-        print(#function)
-        print(error)
-    }
-    
-    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        print(#function)
-        print(locations)
-        guard let coordinate = locations.first?.coordinate else {
-            return
-        }
-
-        mapView.setCenter(coordinate, animated: false)
-        mapView.setCameraZoomRange(.init(maxCenterCoordinateDistance: 1000), animated: false)
-        mapView.addAnnotation(AnnotaionView(
-            y: coordinate.latitude, x: coordinate.longitude,
-            title: "여긴 어디일까요?", subtitle: "여기가 어디냐면...")
-        )
+        return MKOverlayRenderer()
     }
 }
