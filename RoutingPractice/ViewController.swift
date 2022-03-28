@@ -7,6 +7,7 @@
 
 import UIKit
 import MapKit
+import CoreLocation
 
 final class AnnotaionView: NSObject, MKAnnotation {
     private(set) var coordinate: CLLocationCoordinate2D
@@ -26,14 +27,48 @@ final class AnnotaionView: NSObject, MKAnnotation {
 final class ViewController: UIViewController {
     @IBOutlet weak var mapView: MKMapView!
 
+    let locationManager = CLLocationManager()
+
     override func viewDidLoad() {
         super.viewDidLoad()
 
-        let y = 37.29314887492015
-        let x = 126.95954608225948
-        mapView.setCenter(.init(latitude: y, longitude: x), animated: false)
-        mapView.setCameraZoomRange(.init(maxCenterCoordinateDistance: 1000), animated: false)
-        mapView.addAnnotation(AnnotaionView(y: y, x: x, title: "입북동행정복지센터", subtitle: "일까요?"))
+        locationManager.delegate = self
+        locationManager.desiredAccuracy = kCLLocationAccuracyHundredMeters
+
+        if locationManager.authorizationStatus == .notDetermined {
+            locationManager.requestWhenInUseAuthorization()
+        }
     }
 }
 
+extension ViewController: CLLocationManagerDelegate {
+    func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        print(#function)
+        guard manager.authorizationStatus == .authorizedWhenInUse ||
+                manager.authorizationStatus == .authorizedAlways else {
+            return
+        }
+
+        manager.requestLocation()
+    }
+
+    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        print(#function)
+        print(error)
+    }
+    
+    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        print(#function)
+        print(locations)
+        guard let coordinate = locations.first?.coordinate else {
+            return
+        }
+
+        mapView.setCenter(coordinate, animated: false)
+        mapView.setCameraZoomRange(.init(maxCenterCoordinateDistance: 1000), animated: false)
+        mapView.addAnnotation(AnnotaionView(
+            y: coordinate.latitude, x: coordinate.longitude,
+            title: "여긴 어디일까요?", subtitle: "여기가 어디냐면...")
+        )
+    }
+}
